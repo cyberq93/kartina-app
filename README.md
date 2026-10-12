@@ -14,7 +14,9 @@
 | `pbn_engine/segmentation.py` | Разбиение фото на регионы (SLIC + слияние по графу соседства) | `tests/test_segmentation.py` — 4/4 |
 | `pbn_engine/pipeline.py` | Сборка: фото → разметка с номерами + раскраска | `tests/test_pipeline.py` — 3/3 |
 | `pbn_engine/export_pdf.py` | Печатный PDF: лист разметки под размер холста + лист палитры с рецептами | `tests/test_export_pdf.py` — 3/3 |
-| `pbn_engine/api.py` | HTTP API для сайта (Flask) — отдаёт 2 картинки, без рецептов | `tests/test_api.py` — 4/4 |
+| `pbn_engine/api.py` | HTTP API для сайта (Flask): ключ доступа, лимиты, 2 картинки без рецептов | `tests/test_api.py` — 11/11 |
+| `pbn_engine/intake.py` | Безопасное чтение фото: формат, EXIF-поворот, защита от «бомб», HEIC (если есть библиотека) | `tests/test_intake.py` — 8/8 |
+| `deploy/` | Сервис, туннель, мониторинг, инструкция по настройке ПК (`deploy/SETUP.md`) | не проверялось на реальном ПК |
 | `pbn_engine/palette.py` | Палитра красок — **сейчас плацехолдер**, см. ниже | — |
 
 ## Как запустить тесты
@@ -27,9 +29,9 @@ for f in tests/test_*.py; do python3 "$f"; done
 ## Как запустить API локально
 
 ```bash
-python3 -m pbn_engine.api
-# сервер поднимется на http://localhost:8000
-curl -F "photo=@foto.jpg" -F "n_colors=24" http://localhost:8000/process -o result.zip
+PBN_API_KEY=любой-секрет python3 -m pbn_engine.api
+# сервер поднимется на http://127.0.0.1:8000
+curl -H "X-API-Key: любой-секрет" -F "photo=@foto.jpg" -F "n_colors=24" http://127.0.0.1:8000/process -o result.zip
 ```
 
 ## ЧТО НУЖНО ОТ ВАС, чтобы перейти от прототипа к бою
@@ -74,5 +76,8 @@ curl -F "photo=@foto.jpg" -F "n_colors=24" http://localhost:8000/process -o resu
 
 - Хост: двухпроцессорный Xeon 2678v3 (не 9900K — тот занят Фотошопом),
   обоснование — в истории переписки с Claude.
-- Flask dev-сервер (`app.run(...)`) **не для продакшена** — нужен
-  production WSGI-сервер (gunicorn/waitress) перед реальным трафиком с сайта.
+- Встроенный сервер Flask **не для продакшена**: в `deploy/pbn.service`
+  запуск через gunicorn. Порядок настройки ПК — в `deploy/SETUP.md`.
+- HEIC (фото с iPhone) заработает после `pip install pillow-heif`, но
+  декодирование нужно проверить на реальном файле: в среде разработки
+  библиотека была недоступна.

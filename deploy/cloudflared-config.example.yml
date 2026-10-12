@@ -1,0 +1,10 @@
+# Конфиг исходящего туннеля Cloudflare (cloudflared). Входящих портов на
+# роутере не нужно: ПК сам соединяется с Cloudflare, сайт ходит на
+# публичное имя. Заполнить своими значениями (см. SETUP.md, шаг 8).
+tunnel: ИДЕНТИФИКАТОР-ТУННЕЛЯ
+credentials-file: /etc/cloudflared/ИДЕНТИФИКАТОР-ТУННЕЛЯ.json
+
+ingress:
+  - hostname: api.ВАШ-ДОМЕН.ru
+    service: http://127.0.0.1:8000
+  - service: http_status:404

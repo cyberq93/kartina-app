@@ -6,3 +6,6 @@ reportlab==5.0.1
 Pillow==12.3.0
 Flask==3.1.3
 requests==2.34.2
+gunicorn  # на сервере после установки зафиксировать точную версию (pip freeze)
+# HEIC (фото с iPhone): раскомментировать и ПРОВЕРИТЬ на реальном файле
+# pillow-heif

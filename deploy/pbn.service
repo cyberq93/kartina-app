@@ -1,0 +1,33 @@
+# systemd-юнит сервиса. Установка: см. deploy/SETUP.md, шаг 6.
+[Unit]
+Description=pbn_engine (картина по номерам)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pbn
+Group=pbn
+WorkingDirectory=/opt/pbn/app
+# Секреты (PBN_API_KEY и др.) лежат ВНЕ репозитория, права 600, владелец root.
+EnvironmentFile=/etc/pbn/pbn.env
+# Один рабочий процесс + потоки: лимиты запросов и число одновременных
+# обработок в коде считаются в памяти процесса, при нескольких процессах
+# они делились бы между ними неправильно.
+ExecStart=/opt/pbn/venv/bin/gunicorn --workers 1 --threads 4 --timeout 120 \
+    --bind 127.0.0.1:8000 pbn_engine.api:app
+Restart=always
+RestartSec=3
+
+# Ограничения: сервису не нужно ничего, кроме чтения своего кода.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
