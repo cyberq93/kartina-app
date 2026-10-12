@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+output/
+.venv/
+# Реальная палитра и клиентские фото в репозиторий не кладём
+palette.json
+*.jpg
+*.jpeg
+*.heic
