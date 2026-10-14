@@ -32,21 +32,24 @@ MAX_OWN_PRODUCTION_WIDTH_CM = 61.0  # HP DesignJet T520
 
 # ВАЖНО: встроенные базовые шрифты reportlab (Helvetica и т.п.) НЕ
 # поддерживают кириллицу — русский текст печатался бы нечитаемыми
-# квадратами. Регистрируем системный TTF-шрифт с кириллицей один раз при
+# квадратами. Регистрируем TTF-шрифт с кириллицей один раз при
 # импорте модуля и используем его имя вместо "Helvetica" везде ниже.
 _FONT_REGULAR = "DejaVuSans"
 _FONT_BOLD = "DejaVuSans-Bold"
+# Шрифт лежит в проекте (pbn_engine/fonts), а не берётся из системы: пути
+# к системным шрифтам разные на Windows и Linux, и программа не должна
+# от них зависеть.
+_FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 _DEJAVU_PATHS = {
-    _FONT_REGULAR: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    _FONT_BOLD: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    _FONT_REGULAR: os.path.join(_FONT_DIR, "DejaVuSans.ttf"),
+    _FONT_BOLD: os.path.join(_FONT_DIR, "DejaVuSans-Bold.ttf"),
 }
 for _font_name, _path in _DEJAVU_PATHS.items():
     if _font_name not in pdfmetrics.getRegisteredFontNames():
         if not os.path.exists(_path):
             raise RuntimeError(
-                f"Не найден шрифт с поддержкой кириллицы по пути {_path}. "
-                f"Без него весь русский текст в PDF будет нечитаем. "
-                f"Укажите путь к доступному TTF-шрифту (например Arial/DejaVu) вручную."
+                f"Не найден шрифт {_path}. Без него русский текст в PDF будет "
+                f"нечитаем. Проверьте, что папка pbn_engine/fonts на месте."
             )
         pdfmetrics.registerFont(TTFont(_font_name, _path))
 
