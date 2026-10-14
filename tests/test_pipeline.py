@@ -68,6 +68,38 @@ def test_outline_image_has_visible_lines():
     assert black_pixels > 50, f"слишком мало тёмных пикселей в разметке: {black_pixels}"
 
 
+def test_boundaries_drawn_between_all_neighbours_including_nested():
+    """Регрессия: раньше рисовались только внешние контуры, и границы
+    внутри других пятен терялись."""
+    from pbn_engine.pipeline import _draw_boundaries
+    labels = np.ones((60, 60), dtype=np.int32)
+    labels[20:40, 20:40] = 2          # пятно целиком внутри другого
+    labels[:, 50:] = 3                # третье пятно у края
+    edge = _draw_boundaries(labels, thickness=1)
+    assert edge[19, 30] or edge[20, 30], "нет границы вокруг вложенного пятна"
+    assert edge[30, 49] or edge[30, 50], "нет границы между соседними пятнами"
+    assert not edge[5, 5], "линия там, где границы нет"
+
+
+def test_number_is_placed_away_from_image_edge():
+    """Регрессия: у пятен, касающихся края кадра, номер садился на сам край
+    и обрезался."""
+    from pbn_engine.pipeline import _find_label_point
+    mask = np.ones((100, 100), dtype=bool)   # пятно на весь кадр
+    (x, y), radius = _find_label_point(mask)
+    assert 30 < x < 70 and 30 < y < 70, f"номер у края: {(x, y)}"
+    assert radius > 30
+
+
+def test_portrait_end_to_end_has_one_number_per_color():
+    from skimage import data
+    result = generate_pbn(data.astronaut(), PLACEHOLDER_PALETTE, n_colors=24, min_region_fraction=0.002)
+    assert len(result.legend) <= 24
+    assert len(result.region_to_number) > len(result.legend), (
+        "номера должны повторяться у разных пятен одного цвета"
+    )
+
+
 def save_visual_samples():
     """Не тест в строгом смысле — сохраняет файлы, чтобы посмотреть глазами."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)

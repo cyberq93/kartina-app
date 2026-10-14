@@ -11,8 +11,8 @@
 | Модуль | Что делает | Тесты |
 |---|---|---|
 | `pbn_engine/mixing.py` | Подбор смеси красок под цвет (упрощённая двухконстантная Kubelka-Munk) | `tests/test_mixing.py` — 8/8 |
-| `pbn_engine/segmentation.py` | Разбиение фото на регионы (SLIC + слияние по графу соседства) | `tests/test_segmentation.py` — 4/4 |
-| `pbn_engine/pipeline.py` | Сборка: фото → разметка с номерами + раскраска | `tests/test_pipeline.py` — 3/3 |
+| `pbn_engine/segmentation.py` | Разбиение фото на регионы (k-means в Lab + сглаживание границ + слияние мелких пятен) | `tests/test_segmentation.py` — 6/6 |
+| `pbn_engine/pipeline.py` | Сборка: фото → разметка с номерами + раскраска | `tests/test_pipeline.py` — 6/6 |
 | `pbn_engine/export_pdf.py` | Печатный PDF: лист разметки под размер холста + лист палитры с рецептами | `tests/test_export_pdf.py` — 3/3 |
 | `pbn_engine/api.py` | HTTP API для сайта (Flask): ключ доступа, лимиты, 2 картинки без рецептов | `tests/test_api.py` — 11/11 |
 | `pbn_engine/intake.py` | Безопасное чтение фото: формат, EXIF-поворот, защита от «бомб», HEIC (если есть библиотека) | `tests/test_intake.py` — 8/8 |

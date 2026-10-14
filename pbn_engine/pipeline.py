@@ -42,15 +42,43 @@ def _recipe_key(mix: MixResult) -> tuple:
     return tuple(sorted((p.name, round(frac, 2)) for p, frac in mix.components if frac >= 0.02))
 
 
-def _find_label_point(mask: np.ndarray) -> tuple[int, int] | None:
-    """Точка внутри региона, наиболее удалённая от границы — лучшее место
-    для номера (не попадёт на тонкий "хвост" региона сложной формы)."""
-    mask_u8 = mask.astype(np.uint8)
-    dist = cv2.distanceTransform(mask_u8, cv2.DIST_L2, 5)
+def _find_label_point(mask: np.ndarray) -> tuple[tuple[int, int], float]:
+    """Точка внутри пятна, наиболее удалённая от его границы, и эта
+    удалённость в пикселях (радиус вписанного круга). Пятно окружаем нулевой
+    рамкой, иначе у пятен, касающихся края кадра, номер сажается на сам край
+    и обрезается."""
+    padded = cv2.copyMakeBorder(mask.astype(np.uint8), 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+    dist = cv2.distanceTransform(padded, cv2.DIST_L2, 5)
     _, max_val, _, max_loc = cv2.minMaxLoc(dist)
-    if max_val < 3:  # регион слишком тонкий, чтобы в него поместилась цифра
-        return None
-    return max_loc  # (x, y)
+    return (max_loc[0] - 1, max_loc[1] - 1), float(max_val)
+
+
+def _draw_boundaries(labels: np.ndarray, thickness: int) -> np.ndarray:
+    """Границы между ВСЕМИ соседними пятнами (маска True там, где линия).
+    Строится по карте пятен, поэтому видны и границы внутри других пятен,
+    которые терялись при рисовании только внешних контуров."""
+    edge = np.zeros(labels.shape, dtype=bool)
+    edge[:, :-1] |= labels[:, :-1] != labels[:, 1:]
+    edge[:-1, :] |= labels[:-1, :] != labels[1:, :]
+    edge = edge.astype(np.uint8)
+    if thickness > 1:
+        edge = cv2.dilate(edge, np.ones((thickness, thickness), np.uint8))
+    return edge.astype(bool)
+
+
+def _place_number(outline: np.ndarray, text: str, point: tuple[int, int], radius: float, base_scale: float) -> None:
+    """Вписать номер в пятно: шрифт уменьшается, пока цифры не помещаются в
+    вписанный круг. Если не помещаются даже в минимальном размере, всё равно
+    ставим минимальный (лучше мелкий номер, чем незакрашенное пятно без номера)."""
+    scale = base_scale
+    for _ in range(5):
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+        if (tw * tw + th * th) ** 0.5 / 2 + 1 <= radius:
+            break
+        scale *= 0.8
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+    origin = (point[0] - tw // 2, point[1] + th // 2)
+    cv2.putText(outline, text, origin, cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), 1, cv2.LINE_AA)
 
 
 def generate_pbn(
@@ -59,20 +87,23 @@ def generate_pbn(
     n_colors: int = 24,
     min_region_fraction: float = 0.002,
     max_mix_components: int = 2,
-    min_blob_area_for_number: int = 150,
 ) -> PBNResult:
     seg: SegmentationResult = segment_image(
         image_rgb, n_colors=n_colors, min_region_fraction=min_region_fraction
     )
 
-    # Шаг 1: для каждого региона подобрать смесь, сгруппировать по рецепту.
+    # Шаг 1: для каждого цвета подобрать смесь (пятна одного кластера имеют
+    # одинаковый цвет, поэтому считаем один раз), сгруппировать по рецепту.
     recipe_to_number: dict[tuple, int] = {}
+    mix_cache: dict[tuple, MixResult] = {}
     region_mix: dict[int, MixResult] = {}
     region_to_number: dict[int, int] = {}
     legend: list[LegendEntry] = []
 
     for region_id, mean_rgb in seg.region_mean_rgb.items():
-        mix = find_best_mix(mean_rgb, palette, max_components=max_mix_components)
+        if mean_rgb not in mix_cache:
+            mix_cache[mean_rgb] = find_best_mix(mean_rgb, palette, max_components=max_mix_components)
+        mix = mix_cache[mean_rgb]
         region_mix[region_id] = mix
         key = _recipe_key(mix)
         if key not in recipe_to_number:
@@ -81,37 +112,25 @@ def generate_pbn(
             legend.append(LegendEntry(number=number, recipe=mix))
         region_to_number[region_id] = recipe_to_number[key]
 
-    # Шаг 2: раскрашенное изображение — цвет = результат смеси (не фото!).
+    # Шаг 2: раскрашенное изображение. Цвет = результат смеси красок, а не
+    # цвет фото: превью честно показывает, что получится этой палитрой.
     h, w = seg.labels.shape
     colorized = np.zeros((h, w, 3), dtype=np.uint8)
     for region_id, mix in region_mix.items():
         colorized[seg.labels == region_id] = mix.result_rgb
 
-    # Шаг 3: контуры + номера на белом фоне.
+    # Шаг 3: разметка. Линии и номера масштабируются вместе с размером кадра.
+    side = max(h, w)
     outline = np.full((h, w, 3), 255, dtype=np.uint8)
-    for region_id in np.unique(seg.labels):
-        mask = (seg.labels == region_id).astype(np.uint8)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(outline, contours, -1, (0, 0, 0), 1)
+    outline[_draw_boundaries(seg.labels, thickness=max(1, round(side / 800)))] = (0, 0, 0)
 
-        number = region_to_number[int(region_id)]
-        # Регион мог распасться на несколько несвязных кусков при слиянии —
-        # подписываем номер в каждом достаточно крупном куске отдельно.
-        n_blobs, blob_labels = cv2.connectedComponents(mask)
-        for blob_id in range(1, n_blobs):
-            blob_mask = blob_labels == blob_id
-            if blob_mask.sum() < min_blob_area_for_number:
-                continue
-            point = _find_label_point(blob_mask)
-            if point is None:
-                continue
-            text = str(number)
-            font_scale = 0.4
-            (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
-            origin = (point[0] - text_w // 2, point[1] + text_h // 2)
-            cv2.putText(
-                outline, text, origin, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), 1, cv2.LINE_AA
-            )
+    base_scale = max(0.35, side / 1200.0)
+    for region_id, number in region_to_number.items():
+        mask = seg.labels == region_id
+        point, radius = _find_label_point(mask)
+        if radius < 3:  # пятно тоньше трёх пикселей: цифра не поместится
+            continue
+        _place_number(outline, str(number), point, radius, base_scale)
 
     return PBNResult(
         outline_image=outline,
