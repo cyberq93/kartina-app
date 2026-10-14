@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Картина по номерам</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Картина по номерам</h1>
+    <p id="palette-note" class="palette-note" hidden></p>
+  </header>
+
+  <main class="bench">
+    <form id="setup" class="setup" autocomplete="off">
+      <section class="block">
+        <h2>Фото</h2>
+        <label id="drop" class="drop" tabindex="0">
+          <input id="photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
+          <span id="drop-text" class="drop-text">Перетащите фото сюда или нажмите, чтобы выбрать</span>
+          <span class="drop-hint">JPEG, PNG, WEBP</span>
+        </label>
+      </section>
+
+      <section class="block">
+        <h2>Холст</h2>
+        <div class="sizes" id="presets" role="group" aria-label="Готовые размеры"></div>
+        <div class="dims">
+          <label>Ширина, см
+            <input id="width" name="width_cm" type="number" min="10" max="150" step="1" value="40" required>
+          </label>
+          <button id="swap" class="ghost" type="button" aria-label="Поменять ширину и высоту">⇄</button>
+          <label>Высота, см
+            <input id="height" name="height_cm" type="number" min="10" max="150" step="1" value="50" required>
+          </label>
+        </div>
+        <p id="size-note" class="note" hidden></p>
+      </section>
+
+      <section class="block">
+        <h2>Расчёт</h2>
+        <label class="range">
+          <span class="range-head">Красок в картине <output id="n-out">24</output></span>
+          <input id="n-colors" name="n_colors" type="range" min="8" max="40" step="1" value="24">
+          <span class="range-ends"><span>проще</span><span>точнее</span></span>
+        </label>
+        <label class="range">
+          <span class="range-head">Детальность <output id="detail-out">3</output></span>
+          <input id="detail" name="detail" type="range" min="1" max="5" step="1" value="3">
+          <span class="range-ends"><span>крупные пятна</span><span>мелкие детали</span></span>
+        </label>
+      </section>
+
+      <div class="actions">
+        <button id="run" class="primary" type="submit" disabled>Рассчитать</button>
+        <p id="error" class="error" role="alert" hidden></p>
+      </div>
+    </form>
+
+    <section class="stage" aria-label="Результат">
+      <div class="tabs" role="tablist" id="tabs">
+        <button role="tab" data-view="frame" aria-selected="true">Кадр</button>
+        <button role="tab" data-view="outline" aria-selected="false" disabled>Разметка</button>
+        <button role="tab" data-view="colorized" aria-selected="false" disabled>Раскраска</button>
+        <button role="tab" data-view="compare" aria-selected="false" disabled>Сравнить</button>
+      </div>
+
+      <div class="viewport-wrap">
+        <div id="viewport" class="viewport empty">
+          <img id="frame-img" alt="Фото в рамке холста" draggable="false" hidden>
+          <img id="result-img" alt="" draggable="false" hidden>
+          <div id="compare" class="compare" hidden>
+            <img id="cmp-under" alt="" draggable="false">
+            <div id="cmp-over" class="cmp-over"><img id="cmp-over-img" alt="" draggable="false"></div>
+            <div id="cmp-handle" class="cmp-handle" role="slider" tabindex="0"
+                 aria-label="Граница сравнения" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
+          </div>
+          <p id="empty-text" class="empty-text">Выберите фото, и здесь появится кадр холста.</p>
+          <div id="busy" class="busy" hidden><span class="spinner" aria-hidden="true"></span><span>Считаю. Обычно 5–20 секунд.</span></div>
+        </div>
+        <div id="compare-mode" class="compare-mode" hidden>
+          <span>Слева:</span>
+          <button type="button" data-left="outline" aria-pressed="true">Разметка</button>
+          <button type="button" data-left="source" aria-pressed="false">Фото</button>
+          <span>справа раскраска</span>
+        </div>
+        <p id="pan-hint" class="note" hidden>Перетащите фото, чтобы выбрать, какая часть попадёт на холст.</p>
+      </div>
+
+      <div id="facts" class="facts" hidden></div>
+      <p id="stale" class="stale" hidden>Настройки изменились. Нажмите «Рассчитать», чтобы обновить результат.</p>
+
+      <div id="downloads" class="downloads" hidden>
+        <a id="dl-outline-pdf" class="button primary" href="#">Разметка для печати (PDF)</a>
+        <a id="dl-palette-pdf" class="button" href="#">Палитра (PDF)</a>
+        <a id="dl-outline-png" class="button" href="#" download="razmetka.png">Разметка (PNG)</a>
+        <a id="dl-color-png" class="button" href="#" download="raskraska.png">Раскраска (PNG)</a>
+      </div>
+    </section>
+
+    <aside class="chart" aria-label="Краски">
+      <h2>Краски <span id="chart-count" class="count"></span></h2>
+      <p id="chart-empty" class="note">Здесь появится список красок с рецептами смесей.</p>
+      <ol id="chart-list" class="chart-list" hidden></ol>
+      <p id="chart-legend" class="note" hidden>
+        Полоса показывает долю каждой краски в смеси. «Отклонение» — насколько смесь отличается от нужного цвета: до 2 глаз не заметит, выше 6 разница видна.
+      </p>
+    </aside>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
