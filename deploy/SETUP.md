@@ -82,7 +82,7 @@ sudo mkdir -p /opt/pbn /etc/pbn
 sudo apt install -y python3-venv python3-pip git
 sudo git clone https://github.com/cyberq93/kartina-app /opt/pbn/app
 sudo python3 -m venv /opt/pbn/venv
-sudo /opt/pbn/venv/bin/pip install -r /opt/pbn/app/requirements.txt
+sudo /opt/pbn/venv/bin/pip install -r /opt/pbn/app/requirements.txt -r /opt/pbn/app/deploy/requirements-server.txt
 sudo chown -R root:root /opt/pbn      # код сервису доступен только на чтение
 ```
 
@@ -90,7 +90,7 @@ sudo chown -R root:root /opt/pbn      # код сервису доступен �
 развёртывания (deploy key) только на чтение.
 
 Затем зафиксируйте версии: `sudo /opt/pbn/venv/bin/pip freeze` и внесите
-точную версию `gunicorn` в `requirements.txt`.
+точную версию `gunicorn` в `deploy/requirements-server.txt`.
 
 Прогоните тесты на самом ПК:
 
